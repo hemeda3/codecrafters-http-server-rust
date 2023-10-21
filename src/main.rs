@@ -1,8 +1,8 @@
 // Uncomment this block to pass the first stage
-use std::{net::{TcpListener, TcpStream}, io::{Write, Read}};
+use std::{net::{TcpListener, TcpStream}, io::{Write, Read}, time::Duration};
 
-use nom::AsBytes;
-
+ use nom::AsBytes;
+ 
 
 
 
@@ -20,85 +20,63 @@ fn main() {
         match stream {
             Ok(mut _stream) => {
                 println!("accepted new connection1");
-            //    let _ =handle_connection(_stream);
-               let res = handle_connection404(_stream).unwrap();
+                
+                let res = handle_connection404(_stream);
 
-               println!("ffff");
+                println!("{:?}",res);
+
 
                
             }
             Err(e) => {
-                println!("error: {}", e);
+                println!("errorerrorerrorerrorerrorerrorerror: {}", e);
             }
         }
     }
 }
 
 
-fn handle_connection404(mut stream : TcpStream ) -> Result<(), std::io::Error> {
+fn handle_connection404(mut stream : TcpStream ) {
 
-    let mut buf = String::new();
-    print!("hello1");
-    if let Ok(_) = stream.read_to_string(&mut buf){
+    let mut buf_bytes = [0;2048];
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(20)));
+    print!("******************************************************************************************");
+    if let Ok(_) = stream.read(&mut buf_bytes){
 
-        print!("hello12");
-
-       let mut iter = buf.split("\r\n").into_iter();
-       let line1=  iter.next();
-       let line2 = iter.next();
-       let line3 = iter.next();
-       println!("kkkkkk Ah, good, I am able to read usize from serverline1 {:?}",line1);
-       println!("kkkkkk Ah, good, I am able to read usize from serverline2 {:?}",line2);
-
-
-        if let Some(line_as_str) = line1{
-            let mut l1_as_wss = line_as_str.split_whitespace();
-            let method = l1_as_wss.next();
-            let path = l1_as_wss.next();
-            // let proto = l1_as_wss.next();
-            println!("kkkkkk path, pathpathpathpathpathpath {:?}",path);
-
-           if let Some(path) = path {
-            if  path == "/" {
-               let err = stream.write(b"HTTP/1.1 404 Not Found\r\n\r\n".as_bytes()).is_err();
-               if err{
-                panic!("kkkkkk error  HTTP/1.1 404 Not Found");
-               }
-               Ok(())
+        let mut buf = String::from_utf8(buf_bytes.into()).ok().unwrap();
+        let mut iter = buf.split("\r\n");
+        let line1=  iter.next();
+        let _ = iter.next();
+        let _ = iter.next();
+         if let Some(line_as_str) = line1{
+             let mut l1_as_wss = line_as_str.split_whitespace();
+             let _ = l1_as_wss.next();
+             let path = l1_as_wss.next();
+ 
+            if let Some(path) = path {
+                println!("kkkkkk path, pathpathpathpathpathpath {:?}",path);
+             if  path == "/" {
+                eprintln!("path is 200");
+                let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n");
+               
+           
+             } else {
+                eprintln!("path is 400");
+                let _ = stream.write(b"HTTP/1.1 404 OK\r\n\r\n");
+ 
+             }
+ 
             } else {
-                let err = stream.write(b"HTTP/1.1 200 OK\r\n\r\n".as_bytes()).is_err();
-                if err{
-                 panic!("kkkkkk  error HTTP/1.1 200 OK ");
-                }  
-                Ok(())
+             panic!("kkkkkk 444 error HTTP/1.1 200 OK ");
             }
+         } else {
+             panic!("kkkkkk 555 error HTTP/1.1 200 OK ");
+         }
+        
+     } else {
+         panic!("kkkkkk  can't read data from server ")
+     }
 
-           } else {
-            panic!("kkkkkk 444 error HTTP/1.1 200 OK ");
-           }
-        } else {
-            panic!("kkkkkk 555 error HTTP/1.1 200 OK ");
-        }
-       
-    } else {
-        panic!("kkkkkk  can't read data from server ")
-    }
    
 
-}
-fn handle_connection(mut stream : TcpStream ) -> Result<(), std::io::Error> {
-
-
-
-    // stream.write(b"HTTP/1.1 200 OK\r\n\r\n".as_bytes())?;
-
-    
-
-    let response_str = "HTTP/1.1 200 OK\r\n\r\n";
-    let result  =stream.write_all(response_str.as_bytes());
-     handle_connection404(stream)
-
-      
-   
-    
 }
