@@ -45,7 +45,7 @@ async fn handle_connection404(mut stream: TcpStream, director : Option<String>) 
            match parts.len() {
             0 => (None,None),
             1 => (Some(parts[0].to_string().split("\r\n").map(String::from).collect::<Vec<_>>()),None),
-            _ => (Some(parts[0].to_string().split("\r\n").map(String::from).collect::<Vec<_>>()),Some(parts[1].to_string()))
+            _ => (Some(parts[0].to_string().split("\r\n").map(String::from).collect::<Vec<_>>()),Some(parts[1].to_string().trim_matches(char::from(0)).to_string()))
                
            }
         });
@@ -59,30 +59,19 @@ async fn handle_connection404(mut stream: TcpStream, director : Option<String>) 
 
 
         let mut iter = buf.split("\r\n");
-        let mut body :Vec<&str> = iter.clone().collect::<Vec<_>>();
-
+        // let mut body :Vec<&str> = iter.clone().collect::<Vec<_>>();
         let line1 = iter.next();
         let line2_first_header = iter.next();
         let line3_2nd_header = iter.next();
 
 
-        while let Some((idx,line) )= body.iter().enumerate().next() {
-            if *line =="\r\n"{
-               
-                break;;
-            }
-            if body.len()>0 {
-                body.remove(idx);
+    
 
-            }
-            
-        }
-
-        println!("bodybodybodybodybody == {:?}",body);
+        // println!("bodybodybodybodybody == {:?}",body);
 
         if let Some(line_as_str) = line1 {
             let mut l1_as_wss = line_as_str.split_whitespace();
-            let _ = l1_as_wss.next();
+            let method= l1_as_wss.next();
             let path = l1_as_wss.next();
 
             if let Some(path) = path {
@@ -121,8 +110,8 @@ async fn handle_connection404(mut stream: TcpStream, director : Option<String>) 
                     let _ = stream.write(b"\r\n").await?;
                     let _ = stream.write(format!("{}",user_agent.unwrap_or("")).as_bytes()).await?;
                     Ok(())
-                } else if path.contains("/files/") {
-                    eprintln!("Path is /files/");
+                } else if path.contains("/files/") && method.is_some() && method.unwrap() == "GET" {
+                    eprintln!("Path is GET /files/");
 
                     if let Some(file_name) =  path.strip_prefix("/files/") {
                         let full_path = format!("{}/{}",director.clone().unwrap_or("".to_string()),file_name);
@@ -148,9 +137,27 @@ async fn handle_connection404(mut stream: TcpStream, director : Option<String>) 
                             Err(e) =>{
                                 eprintln!("***file not found 404 ");
                                 let _ = stream.write(b"HTTP/1.1 404 OK\r\n\r\n").await?;
+                                                                let _ = stream.write(b"HTTP/1.1 200 OK\r\n").await?;
+
                             }
                         }
                       
+                    }
+                    Ok(())
+                } else if path.contains("/files/") && method.is_some() && method.unwrap() == "POST"  {
+                    eprintln!("Path is POST /files/");
+                    if let Some(file_name) =  path.strip_prefix("/files/") {
+                    let full_path = format!("{}/{}",director.clone().unwrap_or("".to_string()),file_name);
+
+                    let mut file = File::create(full_path).await?;
+                   
+                    println!("here {:?}",body);
+
+                         file.write(body.unwrap().as_bytes()).await?;
+                    
+                    let _ = stream.write(b"HTTP/1.1 201 Created\r\n").await?;
+                    let _ = stream.write(b"\r\n").await?;
+
                     }
                     Ok(())
                 } else{
