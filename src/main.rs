@@ -1,7 +1,5 @@
 // Uncomment this block to pass the first stage
 use std::{
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
     ops::Deref,
     result,
     time::Duration,
@@ -9,29 +7,20 @@ use std::{
 
 // use itertools::Itertools;
 use nom::AsBytes;
+use tokio::{net::{TcpListener,TcpStream}, io::{AsyncReadExt, AsyncWriteExt}};
 
-fn main() {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
 
-    // Uncomment this block to pass the first stage
+#[tokio::main]
+async fn main() ->Result<(), anyhow::Error>{
+    
+    let listener = TcpListener::bind("127.0.0.1:4221").await?;
+    while let Ok(mut stream) = listener.accept().await {
+        // Spawn a new Tokio task to handle each incoming connection
+        tokio::spawn(handle_connection404(stream.0));
 
-    let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
-
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut _stream) => {
-                println!("accepted new connection1");
-
-                let res = handle_connection404(_stream);
-
-                println!("{:?}", res);
-            }
-            Err(e) => {
-                println!("errorerrorerrorerrorerrorerrorerror: {}", e);
-            }
-        }
     }
+    Ok(())
+
 }
 
 pub struct HttpRequest {
@@ -42,11 +31,10 @@ pub struct  HttpResposne {
 
 }
 
-fn handle_connection404(mut stream: TcpStream) {
+async fn handle_connection404(mut stream: TcpStream) {
     let mut buf_bytes = [0; 2048];
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(20)));
     println!("*********************************************************");
-    if let Ok(_) = stream.read(&mut buf_bytes) {
+    if let Ok(_) = stream.read(&mut buf_bytes).await {
         let mut buf = String::from_utf8(buf_bytes.clone().into()).ok().unwrap();
         let mut body_buff = String::from_utf8(buf_bytes.clone().into()).ok();
         let(headers,body) =  body_buff.map_or((None,None),|s| {
@@ -63,7 +51,7 @@ fn handle_connection404(mut stream: TcpStream) {
             v.iter().find(|s| s.starts_with("User-Agent: ")).map_or(None,|s|s.strip_prefix("User-Agent: "))
         });
         println!("here all headers == {:?}",headers);
-        println!("Here body extracted == {:?}",body);
+        // println!("Here body extracted == {:?}",body);
         println!("Extracted user agent user_agent == {:?}",user_agent);
 
 
