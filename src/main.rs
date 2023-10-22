@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+
 // use itertools::Itertools;
 use nom::AsBytes;
 use tokio::{net::{TcpListener,TcpStream}, io::{AsyncReadExt, AsyncWriteExt}};
@@ -14,12 +15,18 @@ use tokio::{net::{TcpListener,TcpStream}, io::{AsyncReadExt, AsyncWriteExt}};
 async fn main() ->Result<(), anyhow::Error>{
     
     let listener = TcpListener::bind("127.0.0.1:4221").await?;
-    while let Ok(mut stream) = listener.accept().await {
+    while let (mut stream) = listener.accept().await? {
         // Spawn a new Tokio task to handle each incoming connection
-        tokio::spawn(handle_connection404(stream.0));
-
+        println!("Spawn a new Tokio task to handle each incoming connection");
+        tokio::spawn(async move {
+            if let Err(e) = handle_connection404(stream.0).await {
+                // Log the error here
+                eprintln!("Error while errrrr handling connection: {:?}", e);
+            }
+        });
     }
     Ok(())
+    
 
 }
 
@@ -31,7 +38,7 @@ pub struct  HttpResposne {
 
 }
 
-async fn handle_connection404(mut stream: TcpStream) {
+async fn handle_connection404(mut stream: TcpStream) -> Result<(), anyhow::Error> {
     let mut buf_bytes = [0; 2048];
     println!("*********************************************************");
     if let Ok(_) = stream.read(&mut buf_bytes).await {
@@ -86,13 +93,14 @@ async fn handle_connection404(mut stream: TcpStream) {
                 println!("kkkkkk path, pathpathpathpathpathpath {:?}", path);
                 if path == "/" {
                     eprintln!("path is 200");
-                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n");
+                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n\r\n").await?;
+                    Ok(())
                 } else if path.contains("/echo/") {
                     eprintln!("path contains -------/ and 200");
                     let results = path.split("/").filter(|p| !p.is_empty()).collect::<Vec<_>>();
                     eprintln!("XXxXX {results:?}");
-                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
-                    let _ = stream.write(b"Content-Type: text/plain\r\n");
+                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n").await?;
+                    let _ = stream.write(b"Content-Type: text/plain\r\n").await?;
                     let res = results.last().unwrap_or(&"");
                     let echo_parts: Vec<_> = results.iter().skip(1).cloned().collect();
                     let res2 = echo_parts.join("/");
@@ -100,25 +108,28 @@ async fn handle_connection404(mut stream: TcpStream) {
                     let content_length_header = format!("Content-Length: {}\r\n", content_length);
                     let content_length_header = content_length_header.as_str();
 
-                    let _ = stream.write(content_length_header.as_bytes());
+                    let _ = stream.write(content_length_header.as_bytes()).await?;
                     // End of headers
-                    let _ = stream.write(b"\r\n");
-                    let _ = stream.write(res2.as_bytes());
+                    let _ = stream.write(b"\r\n").await?;
+                    let _ = stream.write(res2.as_bytes()).await?;
+                    Ok(())
                 } else if path.contains("/user-agent") {
                     eprintln!(" user agent path ");
                     let len = user_agent.map_or(0, |s| {
                         s.len()
                     });
-                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n");
-                    let _ = stream.write(b"Content-Type: text/plain\r\n");
+                    let _ = stream.write(b"HTTP/1.1 200 OK\r\n").await?;
+                    let _ = stream.write(b"Content-Type: text/plain\r\n").await?;
                     let len_msg = format!("Content-Length: {}\r\n",len);
-                    let _ = stream.write(len_msg.as_bytes());
-                    let _ = stream.write(b"\r\n");
-                    let _ = stream.write(format!("{}",user_agent.unwrap_or("")).as_bytes());
-
+                    let _ = stream.write(len_msg.as_bytes()).await?;
+                    let _ = stream.write(b"\r\n").await?;
+                    let _ = stream.write(format!("{}",user_agent.unwrap_or("")).as_bytes()).await?;
+                    Ok(())
                 } else {
                     eprintln!("path is 400");
-                    let _ = stream.write(b"HTTP/1.1 404 OK\r\n\r\n");
+                    let _ = stream.write(b"HTTP/1.1 404 OK\r\n\r\n").await?;
+
+                    Ok(())
                 }
             } else {
                 panic!("kkkkkk 444 error HTTP/1.1 200 OK ");
